@@ -1,9 +1,13 @@
 import re
+import logging
 from playwright.async_api import async_playwright
+
+logger = logging.getLogger(__name__)
 
 
 async def search_avito(query: str) -> list[dict]:
-    url = f"https://www.avito.ru/rossiya?q={query.replace(' ', '+')}"
+    # &s=104 — сортировка по дате, новые первые
+    url = f"https://www.avito.ru/rossiya?q={query.replace(' ', '+')}&s=104"
     results = []
 
     async with async_playwright() as p:
@@ -20,6 +24,8 @@ async def search_avito(query: str) -> list[dict]:
             await page.wait_for_selector("[data-marker='item']", timeout=15000)
 
             items = await page.query_selector_all("[data-marker='item']")
+            logger.info(f"Авито: найдено {len(items)} элементов для '{query}'")
+
             for item in items[:20]:
                 try:
                     item_id_attr = await item.get_attribute("data-item-id")
@@ -47,11 +53,14 @@ async def search_avito(query: str) -> list[dict]:
                         "link": link,
                         "source": "avito",
                     })
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Авито: ошибка парсинга элемента: {e}")
                     continue
-        except Exception:
-            pass
+
+        except Exception as e:
+            logger.error(f"Авито: ошибка загрузки страницы для '{query}': {e}")
         finally:
             await browser.close()
 
+    logger.info(f"Авито: итого {len(results)} совпадений для '{query}'")
     return results
