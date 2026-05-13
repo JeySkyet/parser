@@ -35,10 +35,9 @@ async def check_new_items(bot: Bot):
             new_count += 1
 
             source_label = "Авито" if source == "avito" else "VK Барахолка"
-            price_line = f"\n💰 {item['price']}" if item.get("price") else ""
             text = (
-                f"🆕 Новое объявление [{source_label}]\n"
-                f"📌 {item['title']}{price_line}\n"
+                f"🆕 {game_name}\n"
+                f"📌 {source_label}\n"
                 f"🔗 {item['link']}"
             )
 
