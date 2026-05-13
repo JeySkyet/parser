@@ -12,7 +12,7 @@ _BASE_URL = (
     "-ASgBAgICAUTKAoZP?cd=1"
 )
 
-_ITEM_RE = re.compile(r'"id":(\d{7,}),[^{]*?"urlPath":"([^"?]+)')
+_ITEM_RE = re.compile(r'"id":(\d{7,}),[^{]*?"urlPath":"([^"?]+)[^{]*?"title":"([^"]+)"')
 
 
 def _proxy() -> dict | None:
@@ -38,17 +38,21 @@ def _search(query: str) -> list[dict]:
     resp = session.get(f"{_BASE_URL}&q={quote(query)}", proxies=proxy, timeout=20)
     resp.raise_for_status()
 
+    lq = query.lower()
     results = []
     seen = set()
     for m in _ITEM_RE.finditer(resp.text):
         item_id = m.group(1)
         if item_id in seen:
             continue
+        title = m.group(3)
+        if lq not in title.lower():
+            continue
         seen.add(item_id)
         url_path = m.group(2)
         results.append({
             "id": item_id,
-            "title": "",
+            "title": title,
             "price": "",
             "link": f"https://www.avito.ru{url_path}",
             "source": "avito",
