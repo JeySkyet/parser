@@ -36,7 +36,7 @@ async def check_new_items(bot: Bot):
 
             source_label = "Авито" if source == "avito" else "VK Барахолка"
             text = (
-                f"🆕 {game_name}\n"
+                f"🆕 {game_name.title()}\n"
                 f"📌 {source_label}\n"
                 f"🔗 {item['link']}"
             )
