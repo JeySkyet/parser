@@ -2,7 +2,7 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from db.database import add_subscription, remove_subscription, get_subscriptions
+from db.database import add_subscription, remove_subscription, get_subscriptions, mark_seen
 from scheduler import check_game_now
 
 router = Router()
@@ -29,10 +29,22 @@ async def cmd_subscribe(message: Message):
 
     game = parts[1].strip()
     added = await add_subscription(message.chat.id, game)
-    if added:
-        await message.answer(f'Подписка на "{game}" добавлена. Буду слать уведомления при новых объявлениях.')
-    else:
+    if not added:
         await message.answer(f'Ты уже подписан на "{game}".')
+        return
+
+    await message.answer(f'Подписка на "{game}" добавлена. Собираю текущие объявления...')
+
+    results = await check_game_now(game)
+    all_items = results["avito"] + results["vk"]
+
+    for item in all_items:
+        await mark_seen(item["source"], item["id"])
+
+    await message.answer(
+        f'Готово! Нашёл {len(all_items)} текущих объявлений — они сохранены.\n'
+        f'Буду присылать только новые.'
+    )
 
 
 @router.message(Command("unsubscribe"))
@@ -68,7 +80,7 @@ async def cmd_check(message: Message):
         return
 
     game = parts[1].strip()
-    await message.answer(f'Ищу "{game}" на Авито и в VK... (может занять до минуты)')
+    await message.answer(f'Ищу "{game}" на Авито и в VK...')
 
     results = await check_game_now(game)
     avito = results["avito"]
@@ -79,14 +91,12 @@ async def cmd_check(message: Message):
         await message.answer(f'По запросу "{game}" ничего не найдено.')
         return
 
-    await message.answer(f'Найдено: Авито — {len(avito)}, VK — {len(vk)}')
+    await message.answer(f'Найдено: Авито — {len(avito)}, VK — {len(vk)}. Показываю первые 5:')
 
     for item in (avito + vk)[:5]:
         source_label = "Авито" if item["source"] == "avito" else "VK Барахолка"
-        price_line = f"\n💰 {item['price']}" if item.get("price") else ""
-        text = (
-            f"[{source_label}]\n"
-            f"📌 {item['title']}{price_line}\n"
-            f"🔗 {item['link']}"
+        await message.answer(
+            f'🔍 {game}\n'
+            f'📌 {source_label}\n'
+            f'🔗 {item["link"]}'
         )
-        await message.answer(text)
