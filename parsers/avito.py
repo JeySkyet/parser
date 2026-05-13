@@ -12,7 +12,7 @@ _BASE_URL = (
     "-ASgBAgICAUTKAoZP?cd=1"
 )
 
-_ITEM_RE = re.compile(r'"id":(\d{7,}),[^{]*?"urlPath":"([^"?]+)[^{]*?"title":"([^"]+)"')
+_ITEM_RE = re.compile(r'"id":(\d{7,}),[^{]*?"urlPath":"([^"?]+)[^{]*?"title":"([^"]+)"[^{]*?"description":"([^"]*)"')
 
 
 def _proxy() -> dict | None:
@@ -46,7 +46,8 @@ def _search(query: str) -> list[dict]:
         if item_id in seen:
             continue
         title = m.group(3)
-        if lq not in title.lower():
+        description = m.group(4)
+        if lq not in title.lower() and lq not in description.lower():
             continue
         seen.add(item_id)
         url_path = m.group(2)
