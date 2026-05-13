@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import random
 import re
 
@@ -9,6 +10,8 @@ from playwright.async_api import async_playwright
 logger = logging.getLogger(__name__)
 
 ITEMS_ENDPOINT = "/web/1/js/items"
+_PROXY_HOST = "pool.proxy.market"
+_PROXY_PORTS = range(10000, 11000)
 _STEALTH_SCRIPT = """
 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
@@ -25,7 +28,20 @@ async def search_avito(query: str) -> list[dict]:
         return []
 
 
+def _proxy_config() -> dict | None:
+    user = os.getenv("PROXY_USER")
+    password = os.getenv("PROXY_PASSWORD")
+    if not user or not password:
+        return None
+    port = random.choice(list(_PROXY_PORTS))
+    return {"server": f"http://{_PROXY_HOST}:{port}", "username": user, "password": password}
+
+
 async def _playwright_search(query: str) -> list[dict]:
+    proxy = _proxy_config()
+    if not proxy:
+        logger.warning("Авито: PROXY_USER/PROXY_PASSWORD не заданы, работаем без прокси")
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -35,6 +51,7 @@ async def _playwright_search(query: str) -> list[dict]:
                 "--disable-dev-shm-usage",
                 "--disable-blink-features=AutomationControlled",
             ],
+            proxy=proxy,
         )
         context = await browser.new_context(
             user_agent=(
@@ -63,6 +80,9 @@ async def _playwright_search(query: str) -> list[dict]:
                     ready.set()
 
         page = await context.new_page()
+        await page.route("**/*", lambda route: route.abort()
+            if route.request.resource_type in ("image", "media", "font", "stylesheet")
+            else route.continue_())
         page.on("response", on_response)
 
         await page.goto(
